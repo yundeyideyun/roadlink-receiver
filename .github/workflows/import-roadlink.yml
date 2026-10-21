@@ -1,0 +1,72 @@
+name: Import and verify RoadLink source
+'on':
+  push:
+    branches: [main]
+    paths: ['.bootstrap/**', '.github/workflows/import-roadlink.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import-and-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Reproduce and publish the exact locally validated source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          import_dir="$RUNNER_TEMP/roadlink-verified-import"
+          mkdir -p "$import_dir"
+          cat .bootstrap/part-*.b64 | base64 --decode > "$import_dir/patch.gz"
+          printf '%s  %s\n' '85ba303906ead643e2f589577db279f69d0954dfbedb6e957580bd2dc05f6e67' "$import_dir/patch.gz" | sha256sum --check -
+          gzip --decompress --stdout "$import_dir/patch.gz" > "$import_dir/source.patch"
+          git init "$import_dir/source"
+          git -C "$import_dir/source" remote add origin https://github.com/shihabal3amri/DiPlay.git
+          git -C "$import_dir/source" fetch --depth=1 origin 143f4674b60b564a16baae5110b3b90fb7277631
+          git -C "$import_dir/source" checkout --detach FETCH_HEAD
+          git -C "$import_dir/source" apply --index --binary "$import_dir/source.patch"
+          test "$(git -C "$import_dir/source" write-tree)" = 'b5e9aa36e951be428c84682557a29985a3a7ec8e'
+          env -u GH_TOKEN python3 "$import_dir/source/scripts/check_public_tree.py"
+          rsync -a --delete --exclude='.git' "$import_dir/source/" "$GITHUB_WORKSPACE/"
+          git add --all
+          test "$(git write-tree)" = 'b5e9aa36e951be428c84682557a29985a3a7ec8e'
+          env -u GH_TOKEN python3 scripts/check_public_tree.py
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Publish validated RoadLink receiver source snapshot' -m 'Derived from DiPlay 143f4674b60b564a16baae5110b3b90fb7277631. Original attribution and licenses retained; runtime identities and signing keys excluded.'
+          auth_header="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w 0)"
+          GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth_header" git push origin HEAD:main
+          unset auth_header GH_TOKEN
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;28.2.13676358
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Complete tests, lint and development builds
+        run: ./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :home:testDebugUnitTest :mobile:lintDebug :home:lintDebug :maphost:lintDebug :mobile:assembleDebug :home:assembleDebug :maphost:assembleDebug --stacktrace
+      - name: Check public development APK
+        run: python3 scripts/check_roadlink_apk.py mobile/build/outputs/apk/debug/mobile-debug.apk
+      - name: Development APK - authentication source required
+        uses: actions/upload-artifact@v4
+        with:
+          name: roadlink-development-apk-authentication-required
+          path: mobile/build/outputs/apk/debug/mobile-debug.apk
+      - name: Test and layout reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: roadlink-test-reports
+          path: |
+            shared/build/reports/tests/
+            common/build/reports/tests/
+            common/build/reports/roadlink-setup-ui/
+            mobile/build/reports/lint-results-debug.html
+            samples/home/build/reports/tests/
+            samples/home/build/reports/lint-results-debug.html
+            samples/maphost/build/reports/lint-results-debug.html
