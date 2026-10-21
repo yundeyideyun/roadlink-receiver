@@ -1,0 +1,10 @@
+name: Android checks - awaiting source publication
+'on':
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  awaiting-source:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Source publication and CI activation are still in progress.'
