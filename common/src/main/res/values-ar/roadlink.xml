@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="roadlink_title">مستقبل RoadLink</string>
+    <string name="roadlink_intro">A generic Android head-unit receiver with USB and wireless connection paths. Configure authentication, then open the receiver.</string>
+    <string name="roadlink_validation_boundary">Development preview: receiver code is included. No vehicle or iPhone has been tested by this fork yet.</string>
+    <string name="roadlink_auth_heading">مصدر المصادقة</string>
+    <string name="roadlink_local_ready">Local files are consistent: the key matches the certificate. iPhone trust is still unverified.</string>
+    <string name="roadlink_local_missing">لم يتم إعداد ملفات المصادقة المحلية.</string>
+    <string name="roadlink_local_selected">Selected: local authentication files.</string>
+    <string name="roadlink_usb_selected">Selected: USB/CH341 authentication hardware. Hardware readiness remains unverified.</string>
+    <string name="roadlink_session_busy">A receiver session is running. Disconnect in the receiver before changing authentication.</string>
+    <string name="roadlink_import">استيراد ملفات مصادقة موجودة</string>
+    <string name="roadlink_import_notice">Use existing credentials you are authorized to use. This app does not issue Apple credentials. Files stay in private, non-backed-up storage; no keys enter the public repository.</string>
+    <string name="roadlink_pick_key">1. اختيار المفتاح identity.pk8</string>
+    <string name="roadlink_pick_certificate">2. اختيار الشهادة certificate.p7b</string>
+    <string name="roadlink_selection">تم اختيار المفتاح: %1$s · تم اختيار الشهادة: %2$s</string>
+    <string name="roadlink_yes">نعم</string>
+    <string name="roadlink_no">لا</string>
+    <string name="roadlink_commit">فحص الملفات المحددة وتثبيتها</string>
+    <string name="roadlink_working">Validating local files…</string>
+    <string name="roadlink_use_usb">استخدام عتاد مصادقة USB/CH341</string>
+    <string name="roadlink_usb_notice">A CH341 USB bridge alone is insufficient: it must connect to a compatible authentication coprocessor. The receiver will request USB access and report missing hardware. No hardware has been tested by this fork.</string>
+    <string name="roadlink_remove">إزالة ملفات المصادقة المستوردة</string>
+    <string name="roadlink_remove_confirm">Remove the local authentication files? Local authentication will need to be configured again. Running receiver sessions must be disconnected first.</string>
+    <string name="roadlink_open_receiver">فتح المستقبل</string>
+    <string name="roadlink_not_trust">A matching local key and certificate do not establish Apple authorization or iPhone acceptance. USB, Wi-Fi, video, touch and audio require separate device tests.</string>
+    <string name="roadlink_credits">Derived from DiPlay and xcertplay; UI portions derive from DiAuto. Original authors and GPL/AGPL notices are preserved in the repository and receiver About page. No Apple or vehicle-maker endorsement.</string>
+    <string name="roadlink_import_success">Files installed. Matching verified; iPhone trust is not yet verified.</string>
+    <string name="roadlink_import_failed">Import was not completed. Check file format, matching key/certificate and the 16 KiB per-file limit. Existing valid files were kept.</string>
+    <string name="roadlink_picker_missing">This head unit has no system document picker. Runtime import is unavailable; use the documented external hardware or explicit build-time provisioning.</string>
+</resources>

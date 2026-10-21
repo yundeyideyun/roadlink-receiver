@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="roadlink_title">途连 RoadLink 接收端</string>
+    <string name="roadlink_intro">面向安卓车机，包含 USB 与无线接收路径。先配置认证来源，再进入接收端。</string>
+    <string name="roadlink_validation_boundary">开发预览版：已包含接收端代码；本分支尚未进行车机或 iPhone 实机验证。</string>
+    <string name="roadlink_auth_heading">认证来源</string>
+    <string name="roadlink_local_ready">本地文件校验通过：私钥与证书匹配。iPhone 是否信任仍待连接验证。</string>
+    <string name="roadlink_local_missing">尚未配置本地认证文件。</string>
+    <string name="roadlink_local_selected">当前来源：本地认证文件。</string>
+    <string name="roadlink_usb_selected">当前来源：USB/CH341 认证硬件。硬件就绪情况尚未验证。</string>
+    <string name="roadlink_session_busy">接收端会话正在运行。请先在接收端断开连接，再修改认证配置。</string>
+    <string name="roadlink_import">导入已有认证文件</string>
+    <string name="roadlink_import_notice">仅使用你有权使用的已有认证材料。本应用不会签发 Apple 认证。文件保存在应用私有且排除备份的目录，不会进入公开代码仓库。</string>
+    <string name="roadlink_pick_key">1. 选择 identity.pk8 私钥</string>
+    <string name="roadlink_pick_certificate">2. 选择 certificate.p7b 证书</string>
+    <string name="roadlink_selection">私钥已选择：%1$s · 证书已选择：%2$s</string>
+    <string name="roadlink_yes">是</string>
+    <string name="roadlink_no">否</string>
+    <string name="roadlink_commit">校验并安装所选文件</string>
+    <string name="roadlink_working">正在校验本地文件…</string>
+    <string name="roadlink_use_usb">使用 USB/CH341 认证硬件</string>
+    <string name="roadlink_usb_notice">只有 CH341 USB 转接器还不够，必须连接兼容的认证协处理器。接收端会请求 USB 访问权，并报告硬件缺失等问题。本分支尚未验证任何实物模块。</string>
+    <string name="roadlink_remove">移除导入的认证文件</string>
+    <string name="roadlink_remove_confirm">移除本地认证文件后，需要重新配置才能使用本地认证。请先断开所有接收端会话。是否移除？</string>
+    <string name="roadlink_open_receiver">进入接收端</string>
+    <string name="roadlink_not_trust">本地私钥与证书匹配，不代表已获得 Apple 授权或已被 iPhone 接受。USB、无线、画面、触控和声音都需要分别进行设备测试。</string>
+    <string name="roadlink_credits">基于 DiPlay 与 xcertplay；部分界面来源于 DiAuto。保留原作者与 GPL/AGPL 声明，详见仓库及接收端关于页。无 Apple 或车厂背书。</string>
+    <string name="roadlink_import_success">文件已安装，匹配关系已验证；iPhone 信任状态尚未验证。</string>
+    <string name="roadlink_import_failed">导入未完成。请检查格式、私钥与证书的匹配关系，以及每个文件不超过 16 KiB。已有有效文件已保留。</string>
+    <string name="roadlink_picker_missing">车机未提供系统文件选择器，无法在应用中导入。可使用文档说明的外部认证硬件或显式构建时配置。</string>
+</resources>
