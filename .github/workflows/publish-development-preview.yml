@@ -1,0 +1,154 @@
+name: Publish verified development preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Successful Android checks run whose APK should be published
+        required: true
+        default: '39601126108'
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: roadlink-development-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify CI provenance and publish its original APK
+        uses: actions/github-script@v8
+        env:
+          RELEASE_NOTES: |
+            ## 开发预览版 / Development preview
+
+            面向可安装 APK 的 Android 10+ 设备。尚无本分支真实车机或 iPhone 验证记录，不作为稳定版发布。
+
+            - APK 不包含认证身份。实际连接需要使用者提供有权使用的认证材料或兼容认证协处理器；普通 CH341 转接器本身不够。
+            - 这是调试签名的开发包。不同构建环境的调试签名可能不同，覆盖升级不保证成功；稳定签名发布仍需单独完成。
+            - 发布原始成功 CI 的 APK，仅重命名文件，不重新编译。CI 已通过单元测试、lint、调试构建和公开 APK 凭据检查；发布时再次核验产物摘要和 APK 内容。
+            - 本次 CI 包的 SHA-256 见下方及附件 SHA256SUMS.txt；此前本地构建在 docs/ROADLINK_VALIDATION.md 中的哈希不适用于此包。
+
+            ### 待完成的实机验收
+
+            在驻车状态测试，记录设备、Android/固件、iPhone/iOS 版本和诊断记录。以下均尚未实测：
+
+            | 项目 | 验收内容 |
+            | --- | --- |
+            | 认证与握手 | 使用授权认证来源完成真实 iPhone 握手 |
+            | USB / 无线 | 分别验证首次连接、断开和重连 |
+            | 视频与触控 | 首帧、分辨率、触控坐标和旋转 |
+            | 音乐与导航 | 音频输出、导航提示和音频切换 |
+            | 通话与 Siri | 输入/输出、麦克风和通话恢复 |
+            | 生命周期 | 后台、休眠唤醒和车机重启后的恢复 |
+
+            原始接收端基础来源于 DiPlay/xcertplay，原作者署名与第三方许可随源码保留。
+        with:
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const crypto = require('node:crypto');
+            const {execFileSync} = require('node:child_process');
+            const repo = context.repo;
+            const requested = String(context.payload.inputs.source_run_id);
+            if (!/^\d+$/.test(requested) || !Number.isSafeInteger(Number(requested)))
+              throw new Error('source_run_id must be a positive integer');
+
+            const {data: run} = await github.rest.actions.getWorkflowRun({...repo, run_id: Number(requested)});
+            if (run.status !== 'completed' || run.conclusion !== 'success' ||
+                run.event !== 'push' || run.head_branch !== 'main' ||
+                run.path !== '.github/workflows/android.yml' ||
+                run.head_repository?.full_name !== `${repo.owner}/${repo.repo}`)
+              throw new Error('Only a successful main-branch Android checks push run can be released');
+
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {...repo, run_id: run.id, per_page: 100});
+            const matches = artifacts.filter(a => a.name === 'roadlink-development-apk-authentication-required' && !a.expired);
+            if (matches.length !== 1) throw new Error('Expected exactly one unexpired development APK artifact');
+            const artifact = matches[0];
+            if (artifact.workflow_run?.head_sha !== run.head_sha || !/^sha256:[a-f0-9]{64}$/.test(artifact.digest || ''))
+              throw new Error('Artifact provenance or digest is missing');
+
+            const {data: gradle} = await github.rest.repos.getContent(
+              {...repo, path: 'mobile/build.gradle.kts', ref: run.head_sha});
+            const source = Buffer.from(gradle.content, 'base64').toString('utf8');
+            const version = source.match(/versionName\s*=\s*"([0-9A-Za-z.-]+)"/)?.[1];
+            if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version))
+              throw new Error('Could not determine the source version');
+            const filename = `roadlink-${version}-dev.apk`;
+            const tag = `v${version}-dev`;
+
+            const {data: archive} = await github.rest.actions.downloadArtifact(
+              {...repo, artifact_id: artifact.id, archive_format: 'zip'});
+            const archiveBytes = Buffer.from(archive);
+            const digest = bytes => 'sha256:' + crypto.createHash('sha256').update(bytes).digest('hex');
+            if (digest(archiveBytes) !== artifact.digest) throw new Error('CI artifact SHA-256 mismatch');
+            const temp = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP, 'roadlink-release-'));
+            const zip = path.join(temp, 'artifact.zip');
+            fs.writeFileSync(zip, archiveBytes);
+            const entries = execFileSync('unzip', ['-Z1', zip], {encoding: 'utf8'}).trim().split('\n');
+            if (entries.length !== 1 || entries[0] !== 'mobile-debug.apk')
+              throw new Error('Unexpected CI artifact layout');
+            const apk = execFileSync('unzip', ['-p', zip, 'mobile-debug.apk'], {maxBuffer: 128 * 1024 * 1024});
+            const apkPath = path.join(temp, filename);
+            fs.writeFileSync(apkPath, apk);
+            const {data: checker} = await github.rest.repos.getContent(
+              {...repo, path: 'scripts/check_roadlink_apk.py', ref: run.head_sha});
+            const checkerPath = path.join(temp, 'check_roadlink_apk.py');
+            fs.writeFileSync(checkerPath, Buffer.from(checker.content, 'base64'));
+            core.info(execFileSync('python3', [checkerPath, apkPath], {encoding: 'utf8'}));
+
+            const apkHash = digest(apk).slice('sha256:'.length);
+            const checksums = Buffer.from(`${apkHash}  ${filename}\n`, 'utf8');
+            const body = process.env.RELEASE_NOTES +
+              `\n### 构建来源\n\n- 源码提交：\`${run.head_sha}\`\n` +
+              `- [通过的 Android checks](${run.html_url})\n` +
+              `- 包名：\`org.roadlink.receiver.dev\`；版本：\`${version}-dev\`\n` +
+              `- APK SHA-256：\`${apkHash}\`\n`;
+
+            let release;
+            try {
+              ({data: release} = await github.rest.repos.getReleaseByTag({...repo, tag}));
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            if (release && (!release.draft || release.target_commitish !== run.head_sha))
+              throw new Error('A published release or a draft for another commit already uses this version; no files were overwritten');
+            if (!release) {
+              ({data: release} = await github.rest.repos.createRelease({
+                ...repo, tag_name: tag, target_commitish: run.head_sha,
+                name: `RoadLink ${version}-dev · 开发预览（需认证来源）`,
+                body, draft: true, prerelease: true, make_latest: 'false'
+              }));
+            }
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets,
+              {...repo, release_id: release.id, per_page: 100});
+            const uploads = [
+              {name: filename, data: apk, type: 'application/vnd.android.package-archive'},
+              {name: 'SHA256SUMS.txt', data: checksums, type: 'text/plain; charset=utf-8'}
+            ];
+            if (assets.some(a => !uploads.some(u => u.name === a.name)))
+              throw new Error('Draft contains unexpected assets; review it before retrying');
+            for (const upload of uploads) {
+              const existing = assets.find(a => a.name === upload.name);
+              if (existing) {
+                if (existing.digest !== digest(upload.data)) throw new Error('Existing draft asset differs; no files were overwritten');
+                continue;
+              }
+              await github.rest.repos.uploadReleaseAsset({
+                ...repo, release_id: release.id, name: upload.name, data: upload.data,
+                headers: {'content-type': upload.type, 'content-length': upload.data.length}
+              });
+            }
+            const {data: published} = await github.rest.repos.updateRelease({
+              ...repo, release_id: release.id, body, draft: false,
+              prerelease: true, make_latest: 'false'
+            });
+            await core.summary.addHeading('Development preview published')
+              .addLink(tag, published.html_url).addRaw(`\n\nAPK SHA-256: ${apkHash}\n`).write();
